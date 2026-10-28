@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>Stock Analyser</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 16px;
+            min-height: 100vh;
+        }
+        .container { max-width: 480px; margin: 0 auto; }
+        h1 {
+            text-align: center;
+            font-size: 1.6rem;
+            margin-bottom: 6px;
+            color: #38bdf8;
+        }
+        .subtitle {
+            text-align: center;
+            color: #94a3b8;
+            font-size: 0.85rem;
+            margin-bottom: 18px;
+        }
+        .search-box {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            background: #1e293b;
+            color: white;
+            font-size: 16px;
+        }
+        button {
+            padding: 14px 18px;
+            background: #0ea5e9;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 15px;
+        }
+        .card {
+            background: #1e293b;
+            border-radius: 14px;
+            padding: 18px;
+            margin-bottom: 14px;
+        }
+        .price {
+            font-size: 2.1rem;
+            font-weight: 700;
+            margin: 6px 0;
+        }
+        .change-up { color: #22c55e; }
+        .change-down { color: #ef4444; }
+        .signal {
+            display: inline-block;
+            padding: 5px 14px;
+            border-radius: 20px;
+            font-weight: 600;
+            margin-top: 10px;
+            font-size: 0.9rem;
+        }
+        .buy { background: #166534; color: #86efac; }
+        .sell { background: #7f1d1d; color: #fca5a5; }
+        .hold { background: #334155; color: #cbd5e1; }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 14px;
+        }
+        .metric {
+            background: #0f172a;
+            padding: 12px;
+            border-radius: 10px;
+        }
+        .metric-label {
+            font-size: 0.72rem;
+            color: #94a3b8;
+            margin-bottom: 3px;
+        }
+        .metric-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        .error {
+            background: #7f1d1d;
+            color: #fecaca;
+            padding: 14px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 14px;
+        }
+        .info {
+            background: #1e3a5f;
+            color: #93c5fd;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            margin-bottom: 14px;
+            line-height: 1.45;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 24px;
+            font-size: 0.78rem;
+            color: #64748b;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #94a3b8;
+        }
+        .detected {
+            font-size: 0.82rem;
+            color: #38bdf8;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📈 Stock Analyser</h1>
+        <div class="subtitle">Indian + US Stocks • No .NS needed</div>
+
+        <div class="info">
+            Just type the name:<br>
+             BSL Nifty Healthcare ETF, BSLNIFTY, TATAGOLD, TATSILV, Zerodha Nifty Midcap, Zerodha Silver ETF
+</div>
+
+        <input id="apiKey" placeholder="Twelve Data API Key (US stocks only)" type="password" autocomplete="off" 
+               style="width:100%; padding:12px; margin-bottom:12px; border-radius:10px; border:none; background:#1e293b; color:white;">
+
+        <input id="proxyUrl" placeholder="My proxy URL (optional, for Indian stocks)" autocomplete="off"
+               style="width:100%; padding:12px; margin-bottom:12px; border-radius:10px; border:none; background:#1e293b; color:white; font-size:14px;">
+
+        <div class="search-box">
+            <input type="text" id="symbol" placeholder="Type RELIANCE or AAPL" value="RELIANCE">
+            <button onclick="analyse(false)">Analyse</button>
+        </div>
+
+        <button onclick="intraday(false)" style="width:100%;padding:12px;margin-bottom:12px;border:1px solid #0ea5e9;background:transparent;color:#38bdf8;border-radius:10px;font-size:15px;font-weight:600">⚡ Intraday Plan (entry / stop / target)</button>
+
+        <div style="background:#1e293b;border-radius:10px;padding:12px;margin-bottom:12px">
+            <div style="font-size:0.85rem;color:#94a3b8;margin-bottom:8px">Penny-stock scanner – NSE watchlist (edit freely, max 30)</div>
+            <textarea id="universe" rows="3" style="width:100%;padding:10px;border-radius:8px;border:none;background:#0f172a;color:white;font-size:13px;box-sizing:border-box">IDEA, YESBANK, SUZLON, JPPOWER, RPOWER, IOB, UCOBANK, TRIDENT, SOUTHBANK, HFCL, IRB, PCJEWELLER, TTML, RTNPOWER, GTLINFRA, RENUKA, JAIBALAJI, NHPC</textarea>
+            <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+                <span style="font-size:0.85rem;color:#94a3b8">Max price ₹</span>
+                <input id="maxPrice" value="50" inputmode="decimal" style="width:70px;padding:9px;border-radius:8px;border:none;background:#0f172a;color:white;font-size:14px">
+                <button onclick="scanPenny()" style="flex:1;padding:10px;border:none;background:#0ea5e9;color:white;border-radius:8px;font-weight:600;font-size:14px">🔍 Scan</button>
+            </div>
+        </div>
+
+        <label style="display:flex;align-items:center;gap:8px;font-size:0.85rem;color:#94a3b8;margin-bottom:10px">
+            <input type="checkbox" id="autoRefresh" onchange="toggleAuto()" style="width:18px;height:18px">
+            Auto-refresh every 60s (only while market is open)
+        </label>
+        <div id="status" class="detected" style="color:#94a3b8"></div>
+
+        <div id="result"></div>
+
+        <div class="footer">
+            Auto-detects Indian stocks • Powered by Twelve Data • Indian stocks via Yahoo Finance (free, no key)
+        </div>
+    </div>
+
+    <script>
+const indianStocks = ["RELIANCE","TCS","INFY","HDFCBANK","ICICIBANK","SBIN","BHARTIARTL","ITC","KOTAKBANK","LT","AXISBANK","WIPRO","HCLTECH","BAJFINANCE","MARUTI","SUNPHARMA","TITAN","ULTRACEMCO","NESTLEIND","POWERGRID","NTPC","ONGC","TATAMOTORS","ADANIENT","ADANIPORTS","TECHM","HINDUNILVR","BAJAJFINSV","ASIANPAINT","TATASTEEL","JSWSTEEL","INDUSINDBK","CIPLA","DRREDDY","COALINDIA","BPCL","HEROMOTOCO","EICHERMOT","GRASIM","DIVISLAB"];
+const usStocks = ["AAPL","TSLA","MSFT","GOOGL","GOOG","AMZN","META","NVDA","NFLX","AMD","INTC"];
+
+// Twelve Data uses symbol + exchange params (NOT the Yahoo ".NS" suffix)
+function getCandidates(input) {
+  let raw = input.trim().toUpperCase();
+  if (raw.endsWith(".NS")) return [{symbol: raw.slice(0,-3), exchange: "NSE"}];
+  if (raw.endsWith(".BO")) return [{symbol: raw.slice(0,-3), exchange: "BSE"}];
+  if (usStocks.includes(raw)) return [{symbol: raw, exchange: ""}];
+  if (indianStocks.includes(raw)) return [{symbol: raw, exchange: "NSE"}, {symbol: raw, exchange: "BSE"}];
+  return [{symbol: raw, exchange: ""}, {symbol: raw, exchange: "NSE"}, {symbol: raw, exchange: "BSE"}];
+}
+
+function calculateRSI(closes, period = 14) {
+  if (closes.length < period + 1) return null;
+  let gains = 0, losses = 0;
+  for (let i = 1; i <= period; i++) {
+    const d = closes[i] - closes[i-1];
+    if (d >= 0) gains += d; else losses -= d;
+  }
+  let ag = gains / period, al = losses / period;
+  for (let i = period + 1; i < closes.length; i++) {
+    const d = closes[i] - closes[i-1];
+    ag = (ag * (period-1) + (d > 0 ? d : 0)) / period;
+    al = (al * (period-1) + (d < 0 ? -d : 0)) / period;
+  }
+  if (al === 0) return 100;
+  return 100 - 100 / (1 + ag / al);
+}
+
+function emaSeries(data, period) {
+  const k = 2 / (period + 1);
+  const out = [data[0]];
+  for (let i = 1; i < data.length; i++) out.push(data[i] * k + out[i-1] * (1 - k));
+  return out;
+}
+
+function calculateMACD(closes) {
+  if (closes.length < 35) return null;
+  const e12 = emaSeries(closes, 12), e26 = emaSeries(closes, 26);
+  const macd = closes.map((_, i) => e12[i] - e26[i]);
+  const sig = emaSeries(macd, 9);
+  const n = closes.length - 1;
+  return { macd: macd[n], signal: sig[n], hist: macd[n] - sig[n], prevHist: macd[n-1] - sig[n-1] };
+}
+
+function smaSeries(data, p) {
+  return data.map((_, i) => i < p - 1 ? null : data.slice(i - p + 1, i + 1).reduce((a,b) => a+b, 0) / p);
+}
+
+function computeSignal(price, rsi, sma20, sma50, macd) {
+  let score = 0; const reasons = [];
+  if (rsi !== null) {
+    if (rsi < 30) { score += 2; reasons.push(["+", `RSI ${rsi.toFixed(0)} – oversold`]); }
+    else if (rsi > 70) { score -= 2; reasons.push(["-", `RSI ${rsi.toFixed(0)} – overbought`]); }
+    else reasons.push(["0", `RSI ${rsi.toFixed(0)} – neutral`]);
+  }
+  if (sma20 !== null) {
+    if (price > sma20) { score += 1; reasons.push(["+", "Price above SMA 20"]); }
+    else { score -= 1; reasons.push(["-", "Price below SMA 20"]); }
+  }
+  if (sma50 !== null) {
+    if (price > sma50) { score += 1; reasons.push(["+", "Price above SMA 50"]); }
+    else { score -= 1; reasons.push(["-", "Price below SMA 50"]); }
+  }
+  if (sma20 !== null && sma50 !== null) {
+    if (sma20 > sma50) { score += 1; reasons.push(["+", "SMA 20 above SMA 50 (uptrend)"]); }
+    else { score -= 1; reasons.push(["-", "SMA 20 below SMA 50 (downtrend)"]); }
+  }
+  if (macd) {
+    if (macd.hist > 0) { score += 1; reasons.push(["+", "MACD above signal line"]); }
+    else { score -= 1; reasons.push(["-", "MACD below signal line"]); }
+    if (macd.prevHist <= 0 && macd.hist > 0) { score += 1; reasons.push(["+", "Fresh bullish MACD crossover"]); }
+    if (macd.prevHist >= 0 && macd.hist < 0) { score -= 1; reasons.push(["-", "Fresh bearish MACD crossover"]); }
+  }
+  let label = "HOLD";
+  if (score >= 3) label = "BUY"; else if (score <= -3) label = "SELL";
+  return { label, score, reasons };
+}
+
+function buildChart(closes, cur) {
+  const N = Math.min(closes.length, 120);
+  const start = closes.length - N;
+  const s20 = smaSeries(closes, 20).slice(start);
+  const s50 = smaSeries(closes, 50).slice(start);
+  const px = closes.slice(start);
+  const vals = px.concat(s20.filter(v => v !== null), s50.filter(v => v !== null));
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const W = 340, H = 170, padL = 4, padR = 4, padT = 8, padB = 8;
+  const x = i => padL + (i / (N - 1)) * (W - padL - padR);
+  const y = v => padT + (1 - (v - min) / (max - min || 1)) * (H - padT - padB);
+  const path = arr => arr.map((v, i) => v === null ? "" : `${arr.slice(0, i).some(q => q !== null) ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  return `
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+      <path d="${path(px)}" fill="none" stroke="#38bdf8" stroke-width="2"/>
+      <path d="${path(s20)}" fill="none" stroke="#facc15" stroke-width="1.4"/>
+      <path d="${path(s50)}" fill="none" stroke="#f472b6" stroke-width="1.4"/>
+    </svg>
+    <div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#94a3b8;margin-top:6px">
+      <span>Low ${cur}${min.toFixed(2)}</span><span>High ${cur}${max.toFixed(2)}</span>
+    </div>
+    <div style="display:flex;gap:14px;font-size:0.75rem;margin-top:6px">
+      <span style="color:#38bdf8">● Price</span><span style="color:#facc15">● SMA 20</span><span style="color:#f472b6">● SMA 50</span>
+    </div>`;
+}
+
+function calculateSMA(data, period) {
+  if (data.length < period) return null;
+  return data.slice(-period).reduce((a,b) => a+b, 0) / period;
+}
+
+function buildUrl(endpoint, c, apiKey, extra = "") {
+  let u = `https://api.twelvedata.com/${endpoint}?symbol=${encodeURIComponent(c.symbol)}`;
+  if (c.exchange) u += `&exchange=${c.exchange}`;
+  return u + extra + `&apikey=${encodeURIComponent(apiKey)}`;
+}
+
+async function tryCandidate(c, apiKey) {
+  try {
+    const res = await fetch(buildUrl("quote", c, apiKey));
+    const data = await res.json();
+    if (data && data.close && data.status !== "error") return {quote: data};
+    return {error: data && data.message ? data.message : "Unknown error", code: data && data.code};
+  } catch (e) {
+    return {error: "Network error: " + e.message};
+  }
+}
+
+// ---- Free Indian-stock data via Yahoo Finance (tries direct, then CORS proxies) ----
+async function fetchYahoo(symbol) {
+  const hosts = ["query1", "query2"];
+  const errs = [];
+  for (const h of hosts) {
+    const target = `https://${h}.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1y&interval=1d`;
+    const myProxy = (document.getElementById('proxyUrl').value || "").trim();
+    const routes = [
+      ...(myProxy ? [["my proxy", myProxy + (myProxy.includes("?") ? "&" : "?") + "url=" + encodeURIComponent(target)]] : []),
+      ["direct", target],
+      ["corsproxy", `https://corsproxy.io/?${encodeURIComponent(target)}`],
+      ["allorigins", `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`],
+      ["codetabs", `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(target)}`],
+      ["thingproxy", `https://thingproxy.freeboard.io/fetch/${target}`]
+    ];
+    for (const [name, url] of routes) {
+      try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 8000);
+        const res = await fetch(url, { signal: ctrl.signal });
+        clearTimeout(t);
+        if (!res.ok) { errs.push(`${name}: HTTP ${res.status}`); continue; }
+        const j = await res.json();
+        const r = j && j.chart && j.chart.result && j.chart.result[0];
+        if (!r) { return { error: (j.chart && j.chart.error && j.chart.error.description) || "Symbol not found on Yahoo" }; }
+        const m = r.meta;
+        const closes = (r.indicators.quote[0].close || []).filter(v => v !== null);
+        const prev = closes.length >= 2 ? closes[closes.length - 2] : (m.chartPreviousClose || m.regularMarketPrice);
+        const price = m.regularMarketPrice;
+        return { data: {
+          name: m.longName || m.shortName || symbol,
+          close: price, change: price - prev,
+          percent_change: ((price - prev) / prev) * 100,
+          high: m.regularMarketDayHigh, low: m.regularMarketDayLow,
+          wkHigh: m.fiftyTwoWeekHigh, wkLow: m.fiftyTwoWeekLow,
+          asOf: m.regularMarketTime ? new Date(m.regularMarketTime * 1000) : null,
+          closes } };
+      } catch (e) { errs.push(`${name}: ${e.name === "AbortError" ? "timeout" : "blocked"}`); }
+    }
+  }
+  return { error: "All routes failed → " + errs.join(", ") + noProxyHint() };
+}
+
+const noProxyHint = () => (document.getElementById('proxyUrl').value || "").trim() ? "" : " — Free relays are down. Set up 'My proxy URL' (see proxy_script.gs) for reliable Indian-stock data.";
+// ---------- Market hours ----------
+function isMarketOpen(exchange) {
+  const indian = exchange === "NSE" || exchange === "BSE";
+  const tz = indian ? "Asia/Kolkata" : "America/New_York";
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short", hour: "numeric", minute: "numeric", hour12: false }).formatToParts(new Date());
+  const get = t => parts.find(p => p.type === t).value;
+  const day = get("weekday");
+  if (day === "Sat" || day === "Sun") return false;
+  const mins = (parseInt(get("hour")) % 24) * 60 + parseInt(get("minute"));
+  return indian ? (mins >= 555 && mins <= 930) : (mins >= 570 && mins <= 960); // IN 9:15–15:30, US 9:30–16:00 (holidays not checked)
+}
+
+// ---------- Auto-refresh ----------
+let autoTimer = null, lastExchange = null, tsCache = { key: null, closes: null, t: 0 };
+function setStatus(t) { document.getElementById('status').textContent = t; }
+
+function toggleAuto() {
+  clearInterval(autoTimer); autoTimer = null;
+  if (document.getElementById('autoRefresh').checked) {
+    autoTimer = setInterval(autoTick, 60000);
+    setStatus("Auto-refresh on");
+    autoTick();
+  } else setStatus("");
+}
+function autoTick() {
+  if (document.hidden || !document.getElementById('result').innerHTML) return;
+  if (lastExchange !== null && !isMarketOpen(lastExchange)) { setStatus("Market closed – auto-refresh paused"); return; }
+  if (lastMode === "intra") intraday(true); else if (lastMode === "swing") analyse(true);
+}
+
+// ---------- Remember inputs ----------
+function saveInputs(key, sym) {
+  try { localStorage.setItem("sa_key", key); localStorage.setItem("sa_sym", sym); localStorage.setItem("sa_proxy", document.getElementById('proxyUrl').value.trim()); } catch (e) {}
+}
+window.addEventListener("load", () => {
+  try {
+    const k = localStorage.getItem("sa_key"), y = localStorage.getItem("sa_sym");
+    if (k) document.getElementById('apiKey').value = k;
+    if (y) document.getElementById('symbol').value = y;
+    const u = localStorage.getItem("sa_uni"), m = localStorage.getItem("sa_max");
+    if (u) document.getElementById('universe').value = u;
+    if (m) document.getElementById('maxPrice').value = m;
+    const p = localStorage.getItem("sa_proxy"); if (p) document.getElementById('proxyUrl').value = p;
+  } catch (e) {}
+  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js").catch(() => {});
+});
+
+function buildSupportCard(price, closes, quote, cur) {
+  const yr = closes.slice(-252);
+  const wkHigh = quote.wkHigh || Math.max(...yr), wkLow = quote.wkLow || Math.min(...yr);
+  const recent = closes.slice(-20);
+  const support = Math.min(...recent), resistance = Math.max(...recent);
+  const pos = Math.max(0, Math.min(100, ((price - wkLow) / (wkHigh - wkLow || 1)) * 100));
+  const fromHigh = ((price - wkHigh) / wkHigh) * 100, fromLow = ((price - wkLow) / wkLow) * 100;
+  return `<div class="card">
+    <div style="font-weight:600; margin-bottom:12px;">52-Week Range & Levels</div>
+    <div style="position:relative;height:8px;background:#0f172a;border-radius:6px;margin:6px 0 10px">
+      <div style="position:absolute;left:0;top:0;height:8px;width:${pos.toFixed(1)}%;background:linear-gradient(90deg,#ef4444,#facc15,#22c55e);border-radius:6px"></div>
+      <div style="position:absolute;left:calc(${pos.toFixed(1)}% - 6px);top:-4px;width:12px;height:16px;background:#fff;border-radius:4px"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:0.8rem;color:#94a3b8"><span>${cur}${wkLow.toFixed(2)}</span><span>${cur}${wkHigh.toFixed(2)}</span></div>
+    <div class="grid">
+      <div class="metric"><div class="metric-label">From 52W High</div><div class="metric-value" style="color:#fca5a5">${fromHigh.toFixed(1)}%</div></div>
+      <div class="metric"><div class="metric-label">From 52W Low</div><div class="metric-value" style="color:#86efac">+${fromLow.toFixed(1)}%</div></div>
+      <div class="metric"><div class="metric-label">Support (20-day low)</div><div class="metric-value">${cur}${support.toFixed(2)}</div></div>
+      <div class="metric"><div class="metric-label">Resistance (20-day high)</div><div class="metric-value">${cur}${resistance.toFixed(2)}</div></div>
+    </div></div>`;
+}
+
+// ================= INTRADAY PLAN =================
+let lastMode = "swing", newsCache = { key: null, items: null, t: 0 };
+const esc = t => String(t).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+async function proxyJson(target) {
+  const myProxy = (document.getElementById('proxyUrl').value || "").trim();
+  const routes = [
+    ...(myProxy ? [["my proxy", myProxy + (myProxy.includes("?") ? "&" : "?") + "url=" + encodeURIComponent(target)]] : []),
+    ["direct", target],
+    ["corsproxy", `https://corsproxy.io/?${encodeURIComponent(target)}`],
+    ["allorigins", `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`],
+    ["codetabs", `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(target)}`],
+    ["thingproxy", `https://thingproxy.freeboard.io/fetch/${target}`]
+  ];
+  const errs = [];
+  for (const [name, url] of routes) {
+    try {
+      const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 8000);
+      const res = await fetch(url, { signal: ctrl.signal }); clearTimeout(t);
+      if (!res.ok) { errs.push(`${name}: HTTP ${res.status}`); continue; }
+      return { json: await res.json() };
+    } catch (e) { errs.push(`${name}: ${e.name === "AbortError" ? "timeout" : "failed"}`); }
+  }
+  return { error: "All routes failed → " + errs.join(", ") + noProxyHint() };
+}
+
+async function yahooIntraday(symbol) {
+  const r = await proxyJson(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=5d&interval=5m`);
+  if (r.error) return r;
+  const res = r.json && r.json.chart && r.json.chart.result && r.json.chart.result[0];
+  if (!res || !res.timestamp) return { error: (r.json && r.json.chart && r.json.chart.error && r.json.chart.error.description) || "No intraday data for " + symbol };
+  const q = res.indicators.quote[0], off = res.meta.gmtoffset || 0, bars = [];
+  res.timestamp.forEach((t, i) => {
+    if ([q.open[i], q.high[i], q.low[i], q.close[i]].some(v => v == null)) return;
+    bars.push({ o: q.open[i], h: q.high[i], l: q.low[i], c: q.close[i], v: q.volume[i] || 0, day: new Date((t + off) * 1000).toISOString().slice(0, 10), ts: new Date(t * 1000).toLocaleString() });
+  });
+  return { bars, name: res.meta.longName || res.meta.shortName || symbol };
+}
+
+async function tdIntraday(c, apiKey) {
+  try {
+    const res = await fetch(buildUrl("time_series", c, apiKey, "&interval=5min&outputsize=400"));
+    const j = await res.json();
+    if (!j.values) return { error: j.message || "No intraday data" };
+    const bars = j.values.slice().reverse().map(d => ({ o: +d.open, h: +d.high, l: +d.low, c: +d.close, v: +d.volume || 0, day: d.datetime.slice(0, 10), ts: d.datetime }));
+    return { bars, name: c.symbol };
+  } catch (e) { return { error: "Network error: " + e.message }; }
+}
+
+function rsiSeries(cl, p = 14) {
+  const out = Array(cl.length).fill(null);
+  if (cl.length <= p) return out;
+  let g = 0, l = 0;
+  for (let i = 1; i <= p; i++) { const d = cl[i] - cl[i-1]; if (d >= 0) g += d; else l -= d; }
+  let ag = g / p, al = l / p;
+  out[p] = al === 0 ? 100 : 100 - 100 / (1 + ag / al);
+  for (let i = p + 1; i < cl.length; i++) {
+    const d = cl[i] - cl[i-1];
+    ag = (ag * (p-1) + (d > 0 ? d : 0)) / p; al = (al * (p-1) + (d < 0 ? -d : 0)) / p;
+    out[i] = al === 0 ? 100 : 100 - 100 / (1 + ag / al);
+  }
+  return out;
+}
+
+function atrSeries(b, p = 14) {
+  const out = Array(b.length).fill(null);
+  const tr = b.map((x, i) => i === 0 ? x.h - x.l : Math.max(x.h - x.l, Math.abs(x.h - b[i-1].c), Math.abs(x.l - b[i-1].c)));
+  if (b.length <= p) return out;
+  let a = 0; for (let i = 1; i <= p; i++) a += tr[i]; a /= p; out[p] = a;
+  for (let i = p + 1; i < b.length; i++) { a = (a * (p-1) + tr[i]) / p; out[i] = a; }
+  return out;
+}
+
+function vwapSeries(b) {
+  const out = []; let day = null, pv = 0, vv = 0;
+  b.forEach(x => {
+    if (x.day !== day) { day = x.day; pv = 0; vv = 0; }
+    pv += ((x.h + x.l + x.c) / 3) * x.v; vv += x.v;
+    out.push(vv > 0 ? pv / vv : x.c);
+  });
+  return out;
+}
+
+function buildIntra(bars) {
+  const cl = bars.map(b => b.c);
+  const e9 = emaSeries(cl, 9), e21 = emaSeries(cl, 21), e12 = emaSeries(cl, 12), e26 = emaSeries(cl, 26);
+  const macd = cl.map((_, i) => e12[i] - e26[i]), sg = emaSeries(macd, 9);
+  return { cl, e9, e21, macd, sg, hist: macd.map((m, i) => m - sg[i]), rsi: rsiSeries(cl), atr: atrSeries(bars), vw: vwapSeries(bars) };
+}
+
+function volRatio(i, bars) {
+  if (i < 23) return null;
+  const avg = (a, z) => { let t = 0; for (let k = a; k <= z; k++) t += bars[k].v; return t / (z - a + 1); };
+  const base = avg(i - 22, i - 3);
+  return base > 0 ? avg(i - 2, i) / base : null;
+}
+
+function sigAt(i, bars, S) {
+  const b = bars[i]; let score = 0; const reasons = [];
+  const add = (v, txt) => { score += v; reasons.push([v > 0 ? "+" : v < 0 ? "-" : "0", txt]); };
+  add(b.c > S.vw[i] ? 1 : -1, b.c > S.vw[i] ? "Price above VWAP" : "Price below VWAP");
+  add(S.e9[i] > S.e21[i] ? 1 : -1, S.e9[i] > S.e21[i] ? "EMA 9 above EMA 21 (short-term uptrend)" : "EMA 9 below EMA 21 (short-term downtrend)");
+  add(S.hist[i] > 0 ? 1 : -1, S.hist[i] > 0 ? "MACD above signal line" : "MACD below signal line");
+  const r = S.rsi[i];
+  if (r !== null) {
+    if (r > 75) add(-1, `RSI ${r.toFixed(0)} – overbought`);
+    else if (r >= 50) add(1, `RSI ${r.toFixed(0)} – bullish momentum`);
+    else if (r < 25) add(1, `RSI ${r.toFixed(0)} – oversold bounce`);
+    else add(-1, `RSI ${r.toFixed(0)} – bearish momentum`);
+  }
+  const vr = volRatio(i, bars);
+  if (vr !== null && vr >= 1.5) { const up = b.c >= b.o; add(up ? 1 : -1, `Volume spike ${vr.toFixed(1)}× average (${up ? "buying" : "selling"} bar)`); }
+  else if (vr !== null) reasons.push(["0", `Volume ${vr.toFixed(1)}× average – no spike`]);
+  return { score, reasons, vr };
+}
+
+function backtestIntra(bars, S) {
+  const dayEnd = {}; bars.forEach((b, i) => dayEnd[b.day] = i);
+  const R = []; let i = 30;
+  while (i < bars.length - 1) {
+    if (S.atr[i] == null || dayEnd[bars[i].day] - i < 6) { i++; continue; }
+    const sg = sigAt(i, bars, S);
+    if (Math.abs(sg.score) < 4) { i++; continue; }
+    const dir = sg.score > 0 ? 1 : -1, entry = bars[i].c, risk = 1.5 * S.atr[i];
+    const stop = entry - dir * risk, target = entry + dir * 3 * risk;
+    let res = null, j = i + 1;
+    for (; j < bars.length && bars[j].day === bars[i].day; j++) {
+      const x = bars[j];
+      if (dir > 0 ? x.l <= stop : x.h >= stop) { res = -1; break; }   // stop checked first = conservative
+      if (dir > 0 ? x.h >= target : x.l <= target) { res = 3; break; }
+    }
+    if (res === null) res = ((bars[Math.max(j - 1, i)].c - entry) * dir) / risk;  // squared off at session end
+    R.push(res); i = Math.max(j, i + 1);
+  }
+  const wins = R.filter(r => r > 0).length;
+  return { n: R.length, winRate: R.length ? wins / R.length * 100 : null, avgR: R.length ? R.reduce((a, b) => a + b, 0) / R.length : null };
+}
+
+function planFromBars(bars, inr) {
+  const n = bars.length;
+  if (n < 60) return { error: `Not enough intraday data (${n} bars)` };
+  const S = buildIntra(bars), i = n - 1, b = bars[i];
+  const sg = sigAt(i, bars, S), atr = S.atr[i];
+  const tick = inr ? 0.05 : 0.01, rnd = v => Math.round(v / tick) * tick;
+  const price = b.c, penny = inr ? price < 50 : price < 5;
+  const last20 = bars.slice(-20), turnover = last20.reduce((a, x) => a + x.v * x.c, 0) / last20.length;
+  const thin = turnover < (inr ? 200000 : 20000);
+
+  const byDay = {};
+  bars.forEach(x => { const d = byDay[x.day] || (byDay[x.day] = { h: -Infinity, l: Infinity, n: 0 }); d.h = Math.max(d.h, x.h); d.l = Math.min(d.l, x.l); d.n++; });
+  const days = Object.values(byDay), maxN = Math.max(...days.map(d => d.n));
+  const full = days.filter(d => d.n >= 0.8 * maxN);
+  const avgRange = (full.length ? full : days).reduce((a, d) => a + (d.h - d.l), 0) / (full.length || days.length);
+
+  let dir = sg.score >= 4 ? 1 : sg.score <= -4 ? -1 : 0;
+  const notes = [];
+  const risk = Math.max(1.5 * atr, 2 * tick);
+  if (dir && thin) { notes.push("Liquidity too thin for a reliable intraday plan"); dir = 0; }
+  if (dir && 3 * risk > 0.7 * avgRange) { notes.push("A 3:1 target needs a move over ~70% of a typical day's range – unlikely, skipped"); dir = 0; }
+  if (!dir && !notes.length) notes.push("Indicators don't agree strongly enough (needs a score of +4/-4 or more)");
+
+  let trade = null;
+  if (dir) {
+    const entry = rnd(price), stop = rnd(entry - dir * risk), target = rnd(entry + dir * 3 * risk);
+    trade = { side: dir > 0 ? "BUY" : "SELL", entry, stop, target, rr: Math.abs(target - entry) / Math.abs(entry - stop), riskPct: Math.abs(entry - stop) / entry * 100 };
+  }
+  return { S, sg, atr, atrPct: atr / price * 100, price, penny, thin, turnover, avgRange, trade, notes, bt: backtestIntra(bars, S),
+    vw: S.vw[i], e9: S.e9[i], e21: S.e21[i], rsi: S.rsi[i], macd: S.macd[i], msig: S.sg[i], lastTs: b.ts };
+}
+
+async function fetchNews(sym) {
+  if (newsCache.key === sym && Date.now() - newsCache.t < 600000) return newsCache.items;
+  const r = await proxyJson(`https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(sym)}&newsCount=6&quotesCount=0`);
+  const items = r.json && r.json.news ? r.json.news.map(n => ({ title: n.title, pub: n.publisher, link: n.link, time: n.providerPublishTime })) : null;
+  newsCache = { key: sym, items, t: Date.now() };
+  return items;
+}
+function headlineScore(t) {
+  const pos = /\b(beat|beats|surge|surges|soar|soars|jump|jumps|gain|gains|rally|upgrade|upgraded|record|profit|growth|wins|approval|buyback|dividend|strong)\b/i;
+  const neg = /\b(miss|misses|fall|falls|drop|drops|plunge|slump|downgrade|downgraded|probe|fraud|loss|losses|lawsuit|penalty|ban|recall|weak|cut|cuts|default|raid)\b/i;
+  return (pos.test(t) ? 1 : 0) - (neg.test(t) ? 1 : 0);
+}
+
+function renderIntraday(p, name, label, cur, inr, news, marketOpen) {
+  const f = (v, d = 2) => (v === null || v === undefined || isNaN(v)) ? "N/A" : v.toFixed(d);
+  const t = p.trade;
+  const cls = t ? t.side.toLowerCase() : "hold";
+  let h = `<div class="detected">Intraday plan: <b>${esc(label)}</b><br><span style="color:#94a3b8">${esc(name)} • last 5-min bar ${esc(p.lastTs)}</span></div>`;
+  if (!marketOpen) h += `<div class="card" style="border:1px solid #854d0e;color:#fde68a;font-size:0.85rem">Market is closed. Levels are based on the last session and are only indicative – re-run after the open.</div>`;
+  if (p.penny) h += `<div class="card" style="border:1px solid #991b1b;color:#fecaca;font-size:0.85rem">⚠ Penny-range price (${cur}${p.price.toFixed(2)}): wide spreads, circuit/price limits and manipulation risk. Use small size.</div>`;
+
+  h += `<div class="card"><div style="color:#94a3b8;font-size:0.9rem">Last price</div><div class="price">${cur}${p.price.toFixed(2)}</div>
+    <div class="signal ${cls}">${t ? t.side : "NO TRADE"}</div>
+    <span style="color:#94a3b8;font-size:0.8rem;margin-left:8px">Score ${p.sg.score > 0 ? "+" : ""}${p.sg.score}</span>`;
+  if (t) {
+    h += `<div class="grid" style="margin-top:14px">
+      <div class="metric"><div class="metric-label">Entry</div><div class="metric-value">${cur}${t.entry.toFixed(2)}</div></div>
+      <div class="metric"><div class="metric-label">Stop-loss</div><div class="metric-value" style="color:#fca5a5">${cur}${t.stop.toFixed(2)}</div></div>
+      <div class="metric"><div class="metric-label">Target / Exit</div><div class="metric-value" style="color:#86efac">${cur}${t.target.toFixed(2)}</div></div>
+      <div class="metric"><div class="metric-label">Risk : Reward</div><div class="metric-value">1 : ${t.rr.toFixed(1)}</div></div>
+    </div>
+    <div style="font-size:0.8rem;color:#94a3b8;margin-top:10px">Risk per share ${t.riskPct.toFixed(2)}% of price. Stop = 1.5 × ATR(14). Use a limit order near entry and square off before the close (${inr ? "by ~3:15 PM IST" : "by ~3:45 PM ET"}) if neither level is hit.</div>`;
+  } else {
+    h += `<div style="margin-top:12px;font-size:0.9rem;color:#cbd5e1">${p.notes.map(esc).join("<br>")}</div>`;
+  }
+  h += `</div>`;
+
+  h += `<div class="card"><div style="font-weight:600;margin-bottom:10px">Why</div>${p.sg.reasons.map(([k, x]) =>
+    `<div style="padding:6px 0;font-size:0.88rem;color:${k === "+" ? "#86efac" : k === "-" ? "#fca5a5" : "#cbd5e1"}">${k === "+" ? "▲" : k === "-" ? "▼" : "●"} ${esc(x)}</div>`).join("")}</div>`;
+
+  h += `<div class="card"><div style="font-weight:600;margin-bottom:12px">Indicators (5-min)</div><div class="grid">
+    <div class="metric"><div class="metric-label">VWAP</div><div class="metric-value">${cur}${f(p.vw)}</div></div>
+    <div class="metric"><div class="metric-label">RSI (14)</div><div class="metric-value">${f(p.rsi, 1)}</div></div>
+    <div class="metric"><div class="metric-label">EMA 9 / 21</div><div class="metric-value">${f(p.e9)} / ${f(p.e21)}</div></div>
+    <div class="metric"><div class="metric-label">MACD / Signal</div><div class="metric-value">${f(p.macd, 3)} / ${f(p.msig, 3)}</div></div>
+    <div class="metric"><div class="metric-label">Volume vs avg</div><div class="metric-value">${p.sg.vr === null ? "N/A" : p.sg.vr.toFixed(1) + "×"}</div></div>
+    <div class="metric"><div class="metric-label">ATR (volatility)</div><div class="metric-value">${cur}${f(p.atr)} (${p.atrPct.toFixed(2)}%)</div></div>
+    <div class="metric"><div class="metric-label">Avg daily range</div><div class="metric-value">${cur}${f(p.avgRange)}</div></div>
+    <div class="metric"><div class="metric-label">Liquidity (5-min turnover)</div><div class="metric-value" style="color:${p.thin ? "#fca5a5" : "#86efac"}">${cur}${Math.round(p.turnover).toLocaleString()} ${p.thin ? "• thin" : "• ok"}</div></div>
+  </div></div>`;
+
+  const bt = p.bt;
+  h += `<div class="card"><div style="font-weight:600;margin-bottom:8px">Quick backtest (same rules, last ~5 sessions)</div>` +
+    (bt.n === 0 ? `<div style="font-size:0.88rem;color:#cbd5e1">No qualifying signals in the loaded data.</div>` :
+    `<div style="font-size:0.88rem;color:#cbd5e1">${bt.n} signals • win rate ${bt.winRate.toFixed(0)}% • average ${bt.avgR >= 0 ? "+" : ""}${bt.avgR.toFixed(2)}R per trade</div>`) +
+    `<div style="font-size:0.75rem;color:#94a3b8;margin-top:6px">${bt.n < 10 ? "Very small sample – not statistically meaningful. " : ""}Ignores spreads, slippage and fees. Past results don't predict today.</div></div>`;
+
+  h += `<div class="card"><div style="font-weight:600;margin-bottom:10px">Recent news</div>`;
+  if (!news || !news.length) h += `<div style="font-size:0.85rem;color:#94a3b8">News unavailable (needs a working proxy). Social-media sentiment isn't available in this app.</div>`;
+  else {
+    const tot = news.reduce((a, n) => a + headlineScore(n.title), 0);
+    h += `<div style="font-size:0.8rem;color:#94a3b8;margin-bottom:8px">Headline tone (crude keyword check): <b style="color:${tot > 0 ? "#86efac" : tot < 0 ? "#fca5a5" : "#cbd5e1"}">${tot > 0 ? "Positive" : tot < 0 ? "Negative" : "Neutral / mixed"}</b></div>`;
+    h += news.map(n => {
+      const sc = headlineScore(n.title), href = /^https:\/\//.test(n.link || "") ? esc(n.link) : "#";
+      return `<div style="padding:7px 0;border-top:1px solid #334155;font-size:0.85rem"><a href="${href}" target="_blank" rel="noopener" style="color:#e2e8f0;text-decoration:none">${sc > 0 ? "▲ " : sc < 0 ? "▼ " : ""}${esc(n.title)}</a><div style="color:#64748b;font-size:0.72rem">${esc(n.pub || "")}${n.time ? " • " + new Date(n.time * 1000).toLocaleString() : ""}</div></div>`;
+    }).join("");
+  }
+  h += `</div><div style="text-align:center;font-size:0.72rem;color:#64748b;margin:6px 0 16px">Rule-based indicator output, not investment advice. Trading, especially penny stocks and short-selling, can lose money quickly.</div>`;
+  return h;
+}
+
+async function intraday(silent) {
+  silent = silent === true;
+  const apiKey = document.getElementById('apiKey').value.trim();
+  const rawInput = document.getElementById('symbol').value.trim();
+  const out = document.getElementById('result');
+  if (!rawInput) { out.innerHTML = `<div class="error">Please enter a stock name</div>`; return; }
+
+  let res = null, used = null, lastError = "";
+  for (const c of getCandidates(rawInput)) {
+    const isInd = c.exchange === "NSE" || c.exchange === "BSE";
+    if (!silent) out.innerHTML = `<div class="loading">Loading 5-min data for <b>${esc(c.symbol)}${c.exchange ? " (" + c.exchange + ")" : ""}</b>...</div>`;
+    let r;
+    if (isInd) r = await yahooIntraday(c.symbol + (c.exchange === "NSE" ? ".NS" : ".BO"));
+    else { if (!apiKey) { lastError = "Enter your Twelve Data API key for US stocks"; continue; } r = await tdIntraday(c, apiKey); }
+    if (r.bars && r.bars.length) { res = r; used = c; break; }
+    lastError = r.error || "No data";
+  }
+  if (!res) {
+    if (silent) { setStatus("Refresh failed – will retry"); return; }
+    out.innerHTML = `<div class="error">No intraday data for <b>${esc(rawInput)}</b><br><small style="word-break:break-word">${esc(lastError)}</small></div>`; return;
+  }
+  lastMode = "intra"; lastExchange = used.exchange || "";
+  if (!silent) saveInputs(apiKey, rawInput);
+  const inr = used.exchange === "NSE" || used.exchange === "BSE", cur = inr ? "₹" : "$";
+  const label = used.exchange ? `${used.symbol}.${used.exchange}` : used.symbol;
+  const plan = planFromBars(res.bars, inr);
+  if (plan.error) { out.innerHTML = `<div class="error">${esc(plan.error)}</div>`; return; }
+  const newsSym = inr ? used.symbol + (used.exchange === "NSE" ? ".NS" : ".BO") : used.symbol;
+  const news = await fetchNews(newsSym);
+  out.innerHTML = renderIntraday(plan, res.name, label, cur, inr, news, isMarketOpen(lastExchange));
+  if (document.getElementById('autoRefresh').checked) setStatus(isMarketOpen(lastExchange) ? "Updated " + new Date().toLocaleTimeString() + " • auto-refresh on" : "Market closed – auto-refresh paused");
+}
+
+// ================= PENNY-STOCK SCANNER =================
+const DEFAULT_UNIVERSE = "IDEA, YESBANK, SUZLON, JPPOWER, RPOWER, IOB, UCOBANK, TRIDENT, SOUTHBANK, HFCL, IRB, PCJEWELLER, TTML, RTNPOWER, GTLINFRA, RENUKA, JAIBALAJI, NHPC";
+
+function parseUniverse(t) {
+  const seen = new Set();
+  return String(t).toUpperCase().split(/[\s,;]+/).map(x => x.replace(/\.(NS|BO)$/, "")).filter(x => /^[A-Z0-9&-]{1,20}$/.test(x) && !seen.has(x) && seen.add(x)).slice(0, 30);
+}
+
+function rankScan(rows) {
+  return rows.slice().sort((a, b) =>
+    (b.p.trade ? 1 : 0) - (a.p.trade ? 1 : 0) ||
+    Math.abs(b.p.sg.score) - Math.abs(a.p.sg.score) ||
+    b.p.turnover - a.p.turnover);
+}
+
+function pickStock(sym) {
+  document.getElementById('symbol').value = sym;
+  window.scrollTo(0, 0);
+  intraday(false);
+}
+
+function renderScan(ranked, maxP, above, skipped, total, marketOpen) {
+  const cur = "₹";
+  let h = `<div class="detected">Scan result: <b>${ranked.length}</b> stock(s) at or below ${cur}${maxP}<br><span style="color:#94a3b8">${above.length ? above.length + " above limit • " : ""}${skipped.length ? skipped.length + " had no data • " : ""}${total} scanned</span></div>`;
+  if (!marketOpen) h += `<div class="card" style="border:1px solid #854d0e;color:#fde68a;font-size:0.85rem">Market is closed – ranking uses the last session's data and is only indicative.</div>`;
+  if (!ranked.length) h += `<div class="card" style="font-size:0.9rem;color:#cbd5e1">No stocks passed the price filter. Raise the max price or edit the watchlist.</div>`;
+  ranked.forEach(({ sym, name, p }) => {
+    const t = p.trade, cls = t ? t.side.toLowerCase() : "hold";
+    h += `<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div><div style="font-weight:700;font-size:1.05rem">${esc(sym)}</div><div style="color:#94a3b8;font-size:0.75rem">${esc(name)}</div></div>
+        <div style="text-align:right"><div style="font-weight:600">${cur}${p.price.toFixed(2)}</div><div class="signal ${cls}" style="display:inline-block;margin-top:4px">${t ? t.side : "NO TRADE"}</div></div>
+      </div>`;
+    if (t) h += `<div style="font-size:0.88rem;margin-top:10px;color:#e2e8f0">Entry <b>${cur}${t.entry.toFixed(2)}</b> • Stop <b style="color:#fca5a5">${cur}${t.stop.toFixed(2)}</b> • Target <b style="color:#86efac">${cur}${t.target.toFixed(2)}</b> • 1:${t.rr.toFixed(1)}</div>`;
+    else h += `<div style="font-size:0.82rem;margin-top:10px;color:#94a3b8">${esc(p.notes[0] || "")}</div>`;
+    h += `<div style="font-size:0.75rem;color:#94a3b8;margin-top:8px">Score ${p.sg.score > 0 ? "+" : ""}${p.sg.score} • Vol ${p.sg.vr === null ? "N/A" : p.sg.vr.toFixed(1) + "×"} • ATR ${p.atrPct.toFixed(2)}% • 5-min turnover ${cur}${Math.round(p.turnover).toLocaleString()}${p.thin ? " (thin)" : ""}</div>
+      <button onclick="pickStock('${esc(sym)}')" style="margin-top:10px;width:100%;padding:9px;border:1px solid #334155;background:transparent;color:#38bdf8;border-radius:8px;font-size:14px">Open full plan →</button></div>`;
+  });
+  h += `<div style="text-align:center;font-size:0.72rem;color:#64748b;margin:6px 0 16px">Rule-based scan of your own watchlist, not a recommendation. Penny stocks carry wide spreads, circuit limits and manipulation risk – use small size.</div>`;
+  return h;
+}
+
+async function scanPenny() {
+  const out = document.getElementById('result');
+  const maxP = parseFloat(document.getElementById('maxPrice').value) || 50;
+  const list = parseUniverse(document.getElementById('universe').value);
+  if (!list.length) { out.innerHTML = `<div class="error">Add some NSE symbols to the watchlist first</div>`; return; }
+  try { localStorage.setItem("sa_uni", document.getElementById('universe').value); localStorage.setItem("sa_max", String(maxP)); } catch (e) {}
+  lastMode = "scan";
+  const rows = [], skipped = []; let idx = 0, done = 0, firstErr = "";
+  async function worker() {
+    while (idx < list.length) {
+      const sym = list[idx++];
+      const r = await yahooIntraday(sym + ".NS");
+      done++;
+      out.innerHTML = `<div class="loading">Scanning ${done}/${list.length}...</div>`;
+      if (!r.bars || r.bars.length < 60) { skipped.push(sym); firstErr = firstErr || r.error || ""; continue; }
+      const p = planFromBars(r.bars, true);
+      if (p.error) { skipped.push(sym); continue; }
+      rows.push({ sym, name: r.name, p });
+    }
+  }
+  out.innerHTML = `<div class="loading">Scanning 0/${list.length}...</div>`;
+  await Promise.all([worker(), worker(), worker()]);
+  if (!rows.length) { out.innerHTML = `<div class="error">No data for any symbol<br><small style="word-break:break-word">${esc(firstErr)}${esc(noProxyHint())}</small></div>`; return; }
+  const inRange = rows.filter(x => x.p.price <= maxP), above = rows.filter(x => x.p.price > maxP);
+  out.innerHTML = renderScan(rankScan(inRange), maxP, above, skipped, list.length, isMarketOpen("NSE"));
+  setStatus("Scan finished " + new Date().toLocaleTimeString());
+}
+
+async function analyse(silent) {
+  silent = silent === true;
+  const apiKey = document.getElementById('apiKey').value.trim();
+  const rawInput = document.getElementById('symbol').value.trim();
+  const out = document.getElementById('result');
+
+  if (!rawInput) { out.innerHTML = `<div class="error">Please enter a stock name</div>`; return; }
+
+  const candidates = getCandidates(rawInput);
+  let quote = null, used = null, lastError = "", closes = null;
+
+  for (const c of candidates) {
+    const isInd = c.exchange === "NSE" || c.exchange === "BSE";
+    const label = c.exchange ? `${c.symbol} (${c.exchange})` : c.symbol;
+    if (!silent) out.innerHTML = `<div class="loading">Trying <b>${label}</b>...</div>`;
+
+    if (isInd) {
+      const r = await fetchYahoo(c.symbol + (c.exchange === "NSE" ? ".NS" : ".BO"));
+      if (r.data) { quote = r.data; used = c; closes = r.data.closes; break; }
+      lastError = r.error;
+    } else {
+      if (!apiKey) { lastError = "Enter your Twelve Data API key for US stocks"; continue; }
+      const r = await tryCandidate(c, apiKey);
+      if (r.quote) { quote = r.quote; used = c; break; }
+      lastError = r.error;
+      if (r.code === 401) break;
+    }
+  }
+
+  if (!quote && silent) { setStatus("Refresh failed – will retry (" + lastError.slice(0, 60) + ")"); return; }
+  if (!quote) {
+    out.innerHTML = `<div class="error">No data found for <b>${rawInput}</b><br><small style="word-break:break-word">${lastError}</small></div>`;
+    return;
+  }
+
+  let rsi = null, sma20 = null, sma50 = null, macd = null;
+  try {
+    const ckey = (used.exchange || "") + used.symbol;
+    if (!closes && silent && tsCache.key === ckey && Date.now() - tsCache.t < 600000) closes = tsCache.closes;
+    if (!closes) {
+      const tsRes = await fetch(buildUrl("time_series", used, apiKey, "&interval=1day&outputsize=260"));
+      const ts = await tsRes.json();
+      if (ts.values) { closes = ts.values.map(d => parseFloat(d.close)).reverse(); tsCache = { key: ckey, closes, t: Date.now() }; }
+    }
+    if (closes && closes.length > 50) {
+      rsi = calculateRSI(closes);
+      sma20 = calculateSMA(closes, 20);
+      sma50 = calculateSMA(closes, 50);
+      macd = calculateMACD(closes);
+    }
+  } catch (e) {}
+
+  lastExchange = used.exchange || "";
+  if (!silent) { lastMode = "swing"; saveInputs(apiKey, rawInput); }
+  const current = parseFloat(quote.close);
+  const change = parseFloat(quote.change) || 0;
+  const changePct = parseFloat(quote.percent_change) || 0;
+
+  const sig = computeSignal(current, rsi, sma20, sma50, macd);
+  const signal = sig.label;
+
+  const isIndian = used.exchange === "NSE" || used.exchange === "BSE";
+  const cur = isIndian ? "₹" : "$";
+  const name = used.exchange ? `${used.symbol}.${used.exchange}` : used.symbol;
+  const f = v => (v || v === 0) ? v.toFixed(2) : "N/A";
+  const hi = parseFloat(quote.high), lo = parseFloat(quote.low);
+
+  out.innerHTML = `
+    <div class="detected">Detected: <b>${name}</b>${quote.asOf ? `<br><span style="color:#94a3b8">Last price as of ${quote.asOf.toLocaleString()} (market may be closed)</span>` : ''}</div>
+    <div class="card">
+      <div style="color:#94a3b8; font-size:0.9rem;">${quote.name || name}</div>
+      <div class="price">${cur}${current.toFixed(2)}</div>
+      <div class="${change >= 0 ? 'change-up' : 'change-down'}">
+        ${change >= 0 ? '+' : ''}${change.toFixed(2)} (${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%)
+      </div>
+      <div class="signal ${signal.toLowerCase()}">${signal}</div>
+      <span style="color:#94a3b8;font-size:0.8rem;margin-left:8px">Score ${sig.score > 0 ? '+' : ''}${sig.score}</span>
+    </div>
+    <div class="card">
+      <div style="font-weight:600; margin-bottom:10px;">Why this signal</div>
+      ${sig.reasons.map(([t, txt]) => `<div style="padding:6px 0;font-size:0.88rem;color:${t === '+' ? '#86efac' : t === '-' ? '#fca5a5' : '#cbd5e1'}">${t === '+' ? '▲' : t === '-' ? '▼' : '●'} ${txt}</div>`).join('')}
+    </div>
+    ${closes && closes.length > 50 ? `<div class="card"><div style="font-weight:600; margin-bottom:10px;">Price Chart (last ${Math.min(closes.length,120)} days)</div>${buildChart(closes, cur)}</div>` : ''}
+    ${closes && closes.length > 50 ? buildSupportCard(current, closes, quote, cur) : ''}
+    <div class="card">
+      <div style="font-weight:600; margin-bottom:12px;">Technical Indicators</div>
+      <div class="grid">
+        <div class="metric"><div class="metric-label">RSI (14)</div><div class="metric-value">${f(rsi)}</div></div>
+        <div class="metric"><div class="metric-label">Price</div><div class="metric-value">${cur}${current.toFixed(2)}</div></div>
+        <div class="metric"><div class="metric-label">SMA 20</div><div class="metric-value">${f(sma20)}</div></div>
+        <div class="metric"><div class="metric-label">SMA 50</div><div class="metric-value">${f(sma50)}</div></div>
+        <div class="metric"><div class="metric-label">MACD</div><div class="metric-value">${macd ? macd.macd.toFixed(2) : 'N/A'}</div></div>
+        <div class="metric"><div class="metric-label">MACD Signal</div><div class="metric-value">${macd ? macd.signal.toFixed(2) : 'N/A'}</div></div>
+        <div class="metric"><div class="metric-label">Day High</div><div class="metric-value">${cur}${f(hi)}</div></div>
+        <div class="metric"><div class="metric-label">Day Low</div><div class="metric-value">${cur}${f(lo)}</div></div>
+      </div>
+    </div>`;
+  if (document.getElementById('autoRefresh').checked) setStatus(isMarketOpen(lastExchange) ? "Updated " + new Date().toLocaleTimeString() + " • auto-refresh on" : "Market closed – auto-refresh paused");
+}
+</script>
+</body>
+</html>
